@@ -1,0 +1,56 @@
+version: '3.8'
+
+services:
+  # Frontend - Aplicação React/Vite
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - VITE_API_URL=${BACKEND_URL:-http://localhost:3001}
+    restart: unless-stopped
+    networks:
+      - bravio-network
+
+  # Backend - API Node.js
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=${DATABASE_URL}
+      - PIX_API_KEY=${PIX_API_KEY}
+      - PIX_API_SECRET=${PIX_API_SECRET}
+      - FRONTEND_URL=${FRONTEND_URL}
+    restart: unless-stopped
+    networks:
+      - bravio-network
+    depends_on:
+      - database
+
+  # Database - SQLite (para desenvolvimento) ou PostgreSQL (produção)
+  database:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_DB=bravio
+      - POSTGRES_USER=${DB_USER:-bravio}
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./migrations:/docker-entrypoint-initdb.d
+    restart: unless-stopped
+    networks:
+      - bravio-network
+
+networks:
+  bravio-network:
+    driver: bridge
+
+volumes:
+  postgres_data:

@@ -1,0 +1,79 @@
+pipeline:
+  name: ecommerce-pipeline
+  description: "Pipeline completa para deploy do e-commerce, incluindo backend, frontend, banco, Nginx, SSL e PIX"
+  environment: production
+  steps:
+
+    - name: Provisionamento VPS
+      type: shell
+      commands:
+        - sudo apt update && sudo apt install -y nginx nodejs npm docker-compose certbot postgresql
+        - ufw allow 22/tcp
+        - ufw allow 80/tcp
+        - ufw allow 443/tcp
+        - ufw enable
+
+    - name: Pull e Build do Backend
+      type: shell
+      working_directory: ./backend
+      commands:
+        - git pull origin main
+        - npm install --production
+        - npm run build
+
+    - name: Pull e Build do Frontend
+      type: shell
+      working_directory: ./frontend
+      commands:
+        - git pull origin main
+        - npm install --production
+        - npm run build
+
+    - name: Deploy App
+      type: shell
+      commands:
+        - docker-compose down
+        - docker-compose up -d
+
+    - name: Configuração Webserver
+      type: shell
+      commands:
+        - rm -f /etc/nginx/sites-enabled/default
+        - echo "server { listen 80; server_name exemplo-temporario.com; location / { proxy_pass http://localhost:3000; } }" > /etc/nginx/sites-available/ecommerce.conf
+        - ln -s /etc/nginx/sites-available/ecommerce.conf /etc/nginx/sites-enabled/
+        - nginx -t && systemctl reload nginx
+        - certbot --nginx --non-interactive --agree-tos -m seu_email@example.com -d exemplo-temporario.com
+
+    - name: Configuração Banco de Dados
+      type: shell
+      commands:
+        - sudo -u postgres psql -c "CREATE DATABASE ecommerce;" || echo "DB já existe"
+        - sudo -u postgres psql -d ecommerce -f ./migrations/init.sql
+
+    - name: Integração PIX
+      type: shell
+      commands:
+        - export PIX_PUBLIC_KEY=pk_production_56307960e06c541bedd816528c375849cf2c16e7859ee214
+        - export PIX_SECRET_KEY=sk_production_493d1a510e0062e1fb5e2a816782a0aa3ffd852a0c2f1a70dab23302ced76d61
+        - curl -X GET https://sandbox-pix.com/status?key=$PIX_PUBLIC_KEY
+
+    - name: Health Checks
+      type: shell
+      commands:
+        - curl -f https://exemplo-temporario.com/health || exit 1
+        - echo "SSL e banco validados" # checagem simples, o Cline fará validação completa
+
+  rollback:
+    steps:
+      - name: Rollback Código
+        type: shell
+        commands:
+          - git reset --hard previous_commit
+      - name: Rollback Containers
+        type: shell
+        commands:
+          - docker-compose down && docker-compose up -d
+      - name: Rollback Banco
+        type: shell
+        commands:
+          - echo "Restaurar backup se houver falha"

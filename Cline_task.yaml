@@ -1,0 +1,85 @@
+# Cline Task - Deploy Ecommerce Bravio para Dokploy
+# Pipeline de deploy automático para VPS com Dokploy
+
+version: "1.0"
+
+name: Bravio Ecommerce Deploy
+
+# Configuração do projeto
+project:
+  name: bravio-ecommerce
+  type: webapp
+  
+# Estrutura de pastas
+folders:
+  frontend: ./frontend
+  backend: ./backend
+  migrations: ./migrations
+
+# Builds
+builds:
+  - name: Frontend Build
+    folder: ./frontend
+    command: npm install && npm run build
+    output: dist
+    
+  - name: Backend Build  
+    folder: ./backend
+    command: npm install
+    output: dist
+
+# Deployments
+deployments:
+  - name: Frontend
+    type: static
+    folder: ./frontend/dist
+    domain: ${FRONTEND_DOMAIN:-bravio.loja.com}
+    port: 3000
+    
+  - name: Backend API
+    type: nodejs
+    folder: ./backend
+    command: npm start
+    domain: ${BACKEND_DOMAIN:-api.bravio.loja.com}
+    port: ${BACKEND_PORT:-3001}
+    env:
+      - DATABASE_URL
+      - PIX_API_KEY
+      - PIX_API_SECRET
+
+# Variáveis de ambiente necessárias
+environment:
+  required:
+    - DATABASE_URL
+    - PIX_API_KEY
+    - PIX_API_SECRET
+  optional:
+    - FRONTEND_DOMAIN
+    - BACKEND_DOMAIN
+    - BACKEND_PORT
+
+# Comandos de saúde (healthcheck)
+healthcheck:
+  endpoint: /api/health
+  interval: 30
+  timeout: 10
+  retries: 3
+
+# Pipeline stages
+stages:
+  - name: Build
+    steps:
+      - npm install
+      - npm run build
+      
+  - name: Test
+    steps:
+      - echo "Running tests..."
+      
+  - name: Deploy
+    steps:
+      - echo "Deploying to Dokploy..."
+      
+  - name: Notify
+    steps:
+      - echo "Deployment complete!"
