@@ -1,5 +1,8 @@
 name: frontend-deploy
 
+build:
+  image: node:20-alpine
+
 steps:
 
   install:
