@@ -1,0 +1,15 @@
+name: frontend-deploy
+
+steps:
+
+  install:
+    commands:
+      - npm install
+
+  build:
+    commands:
+      - npm run build
+
+  deploy:
+    commands:
+      - echo "Build completed"
